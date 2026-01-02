@@ -10,6 +10,43 @@ function layoutDiv() {
     el += '</a>';
   }
   el += '</div>';
+  
+  // Helper function to detect post language
+  // Note: This duplicates logic from language-helpers.js because EJS templates
+  // don't have direct access to hexo.getPostLanguage. The logic must be kept in sync.
+  function getPostLanguage(post) {
+    if (post.lang) {
+      return post.lang;
+    }
+    
+    const pathParts = post.source ? post.source.split('/') : [];
+    const postsIndex = pathParts.indexOf('_posts');
+    
+    if (postsIndex !== -1 && postsIndex + 1 < pathParts.length) {
+      const nextPart = pathParts[postsIndex + 1];
+      if (nextPart === 'en' || nextPart === 'jp') {
+        return nextPart;
+      }
+    }
+    
+    return 'zh-TW';
+  }
+  
+  // Get page language from generator data or infer from path
+  let pageLanguage = 'zh-TW';
+  
+  // Always try to infer from path first
+  if (page.path.startsWith('en/')) {
+    pageLanguage = 'en';
+  } else if (page.path.startsWith('jp/')) {
+    pageLanguage = 'jp';
+  }
+  
+  // If not detected from path, use page.lang or default
+  if (pageLanguage === 'zh-TW' && page.lang) {
+    pageLanguage = page.lang;
+  }
+  
   // body
   var arr = [];
   if (page.menu_id == 'wiki') {
@@ -26,8 +63,16 @@ function layoutDiv() {
   } else if (page.notebook) {
     arr = site.pages.filter(p => p.notebook === page.notebook).sort('-updated')
   } else {
-    arr = site.posts.filter( p => p.title && p.title.length > 0)
-    arr = arr.sort("updated", -1)
+    // Filter by language for all pages
+    arr = site.posts.filter( p => {
+      if (!p.title || p.title.length === 0) return false;
+      
+      const postLang = getPostLanguage(p);
+      // Match both exact language code and language prefix (e.g., 'ja' for 'jp')
+      return postLang === pageLanguage || 
+             (pageLanguage === 'jp' && (postLang === 'ja' || postLang === 'jp'));
+    })
+    arr = arr.sort('-updated')
   }
   el += '<div class="widget-body fs14">'
   arr = arr.filter(p => p.title?.length > 0)
