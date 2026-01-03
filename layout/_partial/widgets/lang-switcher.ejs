@@ -1,0 +1,176 @@
+<%
+/**
+ * Language Switcher Widget
+ * - On homepage: shows links to different language homepages
+ * - On article pages: shows links to available translations
+ */
+function layoutDiv() {
+  const languages = {
+    'zh-TW': { name: '中文', path: '/' },
+    'en': { name: 'English', path: '/en/' },
+    'jp': { name: '日本語', path: '/jp/' }
+  };
+
+  // Helper function to detect post language
+  function getPostLanguage(post) {
+    if (post.lang) {
+      return post.lang;
+    }
+
+    const pathParts = post.source ? post.source.split('/') : [];
+    const postsIndex = pathParts.indexOf('_posts');
+
+    if (postsIndex !== -1 && postsIndex + 1 < pathParts.length) {
+      const nextPart = pathParts[postsIndex + 1];
+      if (nextPart === 'en' || nextPart === 'jp') {
+        return nextPart;
+      }
+    }
+
+    return 'zh-TW';
+  }
+
+  // Get current page language
+  let currentLang = 'zh-TW';
+  if (page.path.startsWith('en/')) {
+    currentLang = 'en';
+  } else if (page.path.startsWith('jp/')) {
+    currentLang = 'jp';
+  } else if (page.lang) {
+    currentLang = page.lang;
+  }
+
+  // Check if this is a post page
+  const isPost = page.layout === 'post' && page.source;
+
+  // For posts, find available translations
+  let availableTranslations = {};
+
+  if (isPost) {
+    // Get the base filename (without language prefix directory)
+    const sourceParts = page.source.split('/');
+    const postsIndex = sourceParts.indexOf('_posts');
+    let baseFilename = '';
+
+    if (postsIndex !== -1) {
+      // Get filename, skip language directory if present
+      const afterPosts = sourceParts.slice(postsIndex + 1);
+      if (afterPosts[0] === 'en' || afterPosts[0] === 'jp') {
+        baseFilename = afterPosts.slice(1).join('/');
+      } else {
+        baseFilename = afterPosts.join('/');
+      }
+    }
+
+    // Search for translations in all languages
+    if (baseFilename) {
+      site.posts.forEach(function(post) {
+        if (!post.source) return;
+
+        const postSourceParts = post.source.split('/');
+        const postPostsIndex = postSourceParts.indexOf('_posts');
+
+        if (postPostsIndex !== -1) {
+          const postAfterPosts = postSourceParts.slice(postPostsIndex + 1);
+          let postBaseFilename = '';
+          let postLang = 'zh-TW';
+
+          if (postAfterPosts[0] === 'en') {
+            postLang = 'en';
+            postBaseFilename = postAfterPosts.slice(1).join('/');
+          } else if (postAfterPosts[0] === 'jp') {
+            postLang = 'jp';
+            postBaseFilename = postAfterPosts.slice(1).join('/');
+          } else {
+            postBaseFilename = postAfterPosts.join('/');
+          }
+
+          if (postBaseFilename === baseFilename) {
+            availableTranslations[postLang] = post.path;
+          }
+        }
+      });
+    }
+  }
+
+  var el = '<widget class="widget-wrapper' + scrollreveal(' ') + ' lang-switcher">';
+
+  // Header
+  el += '<div class="widget-header dis-select">';
+  el += '<span class="name">' + (item.title || __('meta.language') || '語言') + '</span>';
+  el += '</div>';
+
+  // Body
+  el += '<div class="widget-body fs14">';
+  el += '<div class="lang-list">';
+
+  if (isPost) {
+    // Show available translations for this post
+    let hasTranslations = false;
+
+    Object.keys(languages).forEach(function(langCode) {
+      const langInfo = languages[langCode];
+      const isCurrent = langCode === currentLang;
+
+      if (availableTranslations[langCode]) {
+        hasTranslations = true;
+        if (isCurrent) {
+          el += '<span class="lang-item current">' + langInfo.name + '</span>';
+        } else {
+          el += '<a class="lang-item" href="' + url_for(availableTranslations[langCode]) + '">' + langInfo.name + '</a>';
+        }
+      }
+    });
+
+    // If no translations found, just show current language
+    if (!hasTranslations) {
+      el += '<span class="lang-item current">' + languages[currentLang].name + '</span>';
+    }
+  } else {
+    // Homepage or other pages: show all language options
+    Object.keys(languages).forEach(function(langCode) {
+      const langInfo = languages[langCode];
+      const isCurrent = langCode === currentLang;
+
+      if (isCurrent) {
+        el += '<span class="lang-item current">' + langInfo.name + '</span>';
+      } else {
+        el += '<a class="lang-item" href="' + url_for(langInfo.path) + '">' + langInfo.name + '</a>';
+      }
+    });
+  }
+
+  el += '</div>';
+  el += '</div>';
+  el += '</widget>';
+
+  return el;
+}
+%>
+<%- layoutDiv() %>
+
+<style>
+.widget-wrapper.lang-switcher .lang-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.widget-wrapper.lang-switcher .lang-item {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 4px;
+  background: var(--block);
+  color: var(--text-p2);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+.widget-wrapper.lang-switcher .lang-item:hover {
+  background: var(--theme);
+  color: white;
+}
+.widget-wrapper.lang-switcher .lang-item.current {
+  background: var(--theme);
+  color: white;
+  cursor: default;
+}
+</style>
